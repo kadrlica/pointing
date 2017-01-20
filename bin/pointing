@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#$Id: pointing 11006 2015-09-01 01:05:15Z kadrlica $
 
 # Simple shell script to call pointing in the background
 source $(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/setup.sh

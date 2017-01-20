@@ -17,13 +17,9 @@ import numpy as np
 import pylab as plt
 import ephem
 
-svnrev = "$Rev: 11164 $"
-svnurl = "$HeadURL: svn+ssh://p-sispi@cdcvs.fnal.gov/cvs/projects/sispi/astrotools/PlotPointings/trunk/python/PlotPointings/pointing.py $"
-
 __author__  = "Alex Drlica-Wagner"
 __email__   = "kadrlica@fnal.gov"
-__version__ = svnurl.strip('$').split()[-1].split(os.sep)[-4]
-__revision__= svnrev.strip('$').split()[-1]
+__version__ ='2.0.0'
 
 MAXREF=5000 # Maximum number of refreshes
 DECAM=1.1 # DECam radius (deg)
@@ -124,23 +120,14 @@ def load_data(opts):
     if opts.infile is None:
         selection = ['id','telra','teldec','filter']
         filter = "exposed = TRUE AND flavor LIKE '%s' AND date > '%s' AND propid LIKE '%s' ORDER BY id DESC"%(opts.flavor,since.isoformat(),propid)
-        if False:
-            # It would be nice to use SISPIlib.select_exposures, but
-            # this doesn't work. At first, an updated version was not
-            # installed. Now SISPIlib.validate is too constraining to
-            # accept this simple query. However, since we are using
-            # read-only access using the FNAL mirror, everything
-            # should be pretty safe....
-            from SISPIlib.exposure import select_exposures
-            data = select_exposures(filter,selection=selection) 
-        else:
-            # Use the FNAL mirror to avoid load on CTIO
-            from database import Database
-            db = Database(dbname='db-fnal')
-            db.connect()
-            query = "SELECT %s FROM exposure WHERE %s"%(','.join(selection),filter)
-            #query = "SELECT id as expnum,telra as ra,teldec as dec,filter as band FROM exposure WHERE exposed = TRUE AND flavor LIKE 'object' and telra between 80 and 82 AND teldec between -71 and -69"
-            data = db.execute(query)       
+        # Use the FNAL mirror to avoid overloading CTIO
+        from database import Database
+        db = Database(dbname='db-fnal')
+        db.connect()
+        query = "SELECT %s FROM exposure WHERE %s"%(','.join(selection),filter)
+        #query = "SELECT id as expnum,telra as ra,teldec as dec,filter as band FROM exposure WHERE exposed = TRUE AND flavor LIKE 'object' and telra between 80 and 82 AND teldec between -71 and -69"
+        data = db.execute(query)
+
         if len(data): ret = np.rec.array(data,dtype=dtype)
         else:         ret = np.rec.recarray(0,dtype=dtype)
             
@@ -496,7 +483,7 @@ def plot(opts):
     # Plot the version number
     vers_kwargs = dict(xy=(0.985,0.015),ha='right',va='bottom',
                        xycoords='figure fraction',size=8)
-    plt.annotate('pointing v.%s'%__version__,**vers_kwargs)
+    plt.annotate('pointing v%s'%__version__,**vers_kwargs)
 
     # Plot the author's name
     auth_kwargs = dict(xy=(0.015,0.015),ha='left',va='bottom',

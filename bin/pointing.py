@@ -1,1 +1,1 @@
-../python/PlotPointings/pointing.py
+../pointing/pointing.py
