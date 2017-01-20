@@ -1,1 +1,1 @@
-../../data/maglites-poly.txt
+data/maglites-poly.txt

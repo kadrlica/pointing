@@ -1,1 +1,1 @@
-../../data/smash_fields_final.txt
+data/smash_fields_final.txt

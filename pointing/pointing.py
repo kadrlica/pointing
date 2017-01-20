@@ -121,7 +121,8 @@ def load_data(opts):
         selection = ['id','telra','teldec','filter']
         filter = "exposed = TRUE AND flavor LIKE '%s' AND date > '%s' AND propid LIKE '%s' ORDER BY id DESC"%(opts.flavor,since.isoformat(),propid)
         # Use the FNAL mirror to avoid overloading CTIO
-        from database import Database
+        try: from database import Database
+        except ImportError: from pointing.database import Database
         db = Database(dbname='db-fnal')
         db.connect()
         query = "SELECT %s FROM exposure WHERE %s"%(','.join(selection),filter)
