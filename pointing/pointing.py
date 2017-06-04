@@ -19,7 +19,7 @@ import ephem
 
 __author__  = "Alex Drlica-Wagner"
 __email__   = "kadrlica@fnal.gov"
-__version__ ='2.0.0'
+__version__ ='2.0.1'
 
 MAXREF=5000 # Maximum number of refreshes
 DECAM=1.1 # DECam radius (deg)
@@ -43,10 +43,13 @@ COLORS = odict([
 ])
 
 PROJ = odict([
-    ('ortho' , dict(projection='ortho',celestial=True)),
-    ('moll'  , dict(projection='moll',celestial=True)),
-    ('mol'   , dict(projection='moll',celestial=True)),
-    ('ait'   , dict(projection='hammer',celestial=True)),
+    ('ortho'  , dict(projection='ortho',celestial=True)),
+    ('moll'   , dict(projection='moll',celestial=True)),
+    ('mol'    , dict(projection='moll',celestial=True)),
+    ('ait'    , dict(projection='hammer',celestial=True)),
+    ('mbtfpq' , dict(projection='mbtfpq',celestial=True)),
+    ('mbt'    , dict(projection='mbtfpq',celestial=True)),
+    ('mcbride', dict(projection='mbtfpq',celestial=True)),
 ])
 
 # Derived from telra,teldec of 10000 exposures
@@ -71,7 +74,7 @@ SN_LABELS = odict([
 ])
 
 # The allowed footprint outlines
-FOOTPRINTS = ['none','des','des-sn','smash','maglites']
+FOOTPRINTS = ['none','des','des-sn','smash','maglites','bliss']
 
 # CTIO location taken from:
 #http://www.ctio.noao.edu/noao/content/Coordinates-Observatories-Cerro-Tololo-and-Cerro-Pachon
@@ -119,7 +122,8 @@ def load_data(opts):
 
     if opts.infile is None:
         selection = ['id','telra','teldec','filter']
-        filter = "exposed = TRUE AND flavor LIKE '%s' AND date > '%s' AND propid LIKE '%s' ORDER BY id DESC"%(opts.flavor,since.isoformat(),propid)
+        #filter = "exposed = TRUE AND flavor LIKE '%s' AND date > '%s' AND propid LIKE '%s' ORDER BY id DESC"%(opts.flavor,since.isoformat(),propid)
+        filter = "exposed = TRUE AND flavor SIMILAR TO '%s' AND date > '%s' AND propid LIKE '%s' ORDER BY id DESC"%(opts.flavor,since.isoformat(),propid)
         # Use the FNAL mirror to avoid overloading CTIO
         try: from database import Database
         except ImportError: from pointing.database import Database
@@ -131,8 +135,8 @@ def load_data(opts):
 
         if len(data): ret = np.rec.array(data,dtype=dtype)
         else:         ret = np.rec.recarray(0,dtype=dtype)
-            
-        return ret        
+
+        return ret
     else:
         return np.loadtxt(opts.infile,dtype=dtype)
 
@@ -170,12 +174,12 @@ def splash_screen():
     logging.info(splash)
 
 def parse_utc(value):
-    """ Parse isoformat 'utc' option string. """ 
+    """ Parse isoformat 'utc' option string. """
     if value is None:
         utc = datetime.now(tz=UTC())
     elif isinstance(value,datetime):
         utc = value
-    else: 
+    else:
         utc = dateutil.parser.parse(value,tzinfos={'UTC':UTC})
     logging.debug("UTC: %s"%utc.strftime('%Y-%m-%d %H:%M:%S'))
     return utc
@@ -187,9 +191,9 @@ def parse_since(value):
     elif isinstance(value,datetime):
         since = value
     elif value.lower() in ['all','none','forever']:
-        since = dateutil.parser.parse('2012-01-01 12:00',tzinfos={'UTC':UTC}) 
-    else: 
-        since = dateutil.parser.parse(value,tzinfos={'UTC':UTC})        
+        since = dateutil.parser.parse('2012-01-01 12:00',tzinfos={'UTC':UTC})
+    else:
+        since = dateutil.parser.parse(value,tzinfos={'UTC':UTC})
     logging.debug("Since: %s"%since.strftime('%Y-%m-%d %H:%M:%S'))
     return since
 
@@ -208,7 +212,7 @@ def draw_constellation(proj,name):
 def draw_des(bmap,**kwargs):
     """
     Plot the DES wide-field footprint.
-    
+
     Parameters:
     -----------
     bmap   : The basemap object
@@ -229,7 +233,7 @@ def draw_des(bmap,**kwargs):
 def draw_des_sn(bmap,**kwargs):
     """
     Plot the DES supernova fields.
-    
+
     Parameters:
     -----------
     bmap   : The basemap object
@@ -239,9 +243,9 @@ def draw_des_sn(bmap,**kwargs):
     --------
     None
     """
-    # Plot the SN fields 
+    # Plot the SN fields
     logging.debug("Plotting DES supernova fields.")
-    # Check that point inside boundary 
+    # Check that point inside boundary
     # Doesn't work for 'ait' and 'moll' projections
     fact = 0.99
     projection = kwargs.pop('projection',None)
@@ -249,7 +253,7 @@ def draw_des_sn(bmap,**kwargs):
         # This was estimated by eye...
         rminor=9.00995e6; rmajor = 2*rminor
         boundary = Ellipse((rmajor,rminor),
-                           2*(fact*rmajor),2*(fact*rminor))     
+                           2*(fact*rmajor),2*(fact*rminor))
     else:
         boundary = Ellipse((bmap.rmajor,bmap.rminor),
                            2*(fact*bmap.rmajor),2*(fact*bmap.rminor))
@@ -265,11 +269,11 @@ def draw_des_sn(bmap,**kwargs):
                                   alpha=0.25))
     for k,v in SN_LABELS.items():
         plt.gca().annotate(k,bmap(*v),**sntxt_kwargs)
-    
+
 def draw_smash(bmap,**kwargs):
     basedir = os.path.dirname(os.path.abspath(__file__))
     filename = os.path.join(basedir,'smash_fields_final.txt')
-    
+
     smash=np.genfromtxt(filename,dtype=[('ra',float),('dec',float)],usecols=[4,5])
     smash_x,smash_y = safe_proj(bmap,smash['ra'],smash['dec'])
     kwargs.update(dict(facecolor='none'))
@@ -283,6 +287,30 @@ def draw_maglites(bmap,**kwargs):
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float)])
     proj = safe_proj(bmap,perim['ra'],perim['dec'])
     bmap.plot(*proj,**kwargs)
+
+
+def draw_bliss(bmap,**kwargs):
+    """
+    Plot the BLISS wide-field footprint.
+
+    Parameters:
+    -----------
+    bmap   : The basemap object
+    kwargs : Various plotting arguments
+
+    Returns:
+    --------
+    None
+    """
+    # Plot the wide-field survey footprint
+    logging.debug("Plotting footprint: %s"%opts.footprint)
+    basedir = os.path.dirname(os.path.abspath(__file__))
+    infile = os.path.join(basedir,'bliss-poly.txt')
+    perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float),('poly',int)])
+    for p in np.unique(perim['poly']):
+        sel = (perim['poly'] == p)
+        proj = safe_proj(bmap,perim[sel]['ra'],perim[sel]['dec'])
+        bmap.plot(*proj,**kwargs)
 
 
 def plot(opts):
@@ -323,19 +351,19 @@ def plot(opts):
         idx = np.nonzero(match)[0][0]
     elif len(data)==0:
         idx = slice(None)
-    else:   
+    else:
         idx = 0
 
     # Create the figure
     if plt.get_fignums():
         fig,ax = plt.gcf(),plt.gca()
-    else: 
+    else:
         fig,ax = plt.subplots(figsize=FIGSIZE,dpi=DPI)
         fig.canvas.set_window_title("DECam Pointings")
     #fig,ax = plt.subplots()
 
     # Zenith position
-    lon_zen=lmst(CTIO); lat_zen = TEL_LAT 
+    lon_zen=lmst(CTIO); lat_zen = TEL_LAT
     # Create the Basemap
     proj_kwargs = PROJ[opts.proj]
     # Centering position
@@ -378,7 +406,7 @@ def plot(opts):
     x,y = safe_proj(m,telra,teldec)
 
     # Plot exposure of interest
-    if len(data): 
+    if len(data):
         logging.debug("Plotting exposure: %i (%3.2f,%3.2f)"%(expnum[idx],telra[idx],teldec[idx]))
         # Hacked path effect (fix if matplotlib is updated)
         m.scatter(x[idx],y[idx],color='w',**dict(exp_kwargs,edgecolor='w',s=70,lw=2))
@@ -453,20 +481,23 @@ def plot(opts):
     if 'maglites' in opts.footprint:
         maglites_kwargs = dict(marker='o',mew=0,mfc='none',color='r',lw=2,zorder=fp_zorder)
         draw_maglites(m,**maglites_kwargs)
+    if 'bliss' in opts.footprint:
+        bliss_kwargs = dict(marker='o',mew=0,mfc='none',color='m',lw=2,zorder=fp_zorder)
+        draw_bliss(m,**bliss_kwargs)
 
     # Annotate with some information
     if opts.legend:
         logging.debug("Adding info text.")
         bbox_props = dict(boxstyle='round', facecolor='white')
         textstr= "%s %s\n"%("UTC:",utc.strftime('%Y-%m-%d %H:%M:%S'))
-        if len(data): 
+        if len(data):
             textstr+="%s %i (%s)\n"%("Exposure:",expnum[idx],band[idx])
         textstr+="%s %i\n"%("Num. Exp.:",numexp)
         textstr+="%s (%.1f$^{\circ}$, %.1f$^{\circ}$)\n"%("Zenith:",lon_zen,lat_zen)
         textstr+="%s %s\n"%("Airmass:",np.nan_to_num(opts.airmass))
         textstr+="%s %i%% (%.1f$^{\circ}$, %.1f$^{\circ}$)\n"%("Moon:",moon_phase,moon_ra,moon_dec)
         textstr+="%s %s"%("Footprint:",', '.join(opts.footprint))
-         
+
         ax.annotate(textstr, xy=(0.90,1.05), xycoords='axes fraction',
                     fontsize=10,ha='left',va='top', bbox=bbox_props)
 
@@ -484,7 +515,7 @@ def plot(opts):
     # Plot the version number
     vers_kwargs = dict(xy=(0.985,0.015),ha='right',va='bottom',
                        xycoords='figure fraction',size=8)
-    plt.annotate('pointing v%s'%__version__,**vers_kwargs)
+    plt.annotate('pointing v.%s'%__version__,**vers_kwargs)
 
     # Plot the author's name
     auth_kwargs = dict(xy=(0.015,0.015),ha='left',va='bottom',
@@ -508,7 +539,7 @@ if __name__ == "__main__":
                         help='color corresponding to filter')
     parser.add_argument('-f','--footprint',action='append',choices=FOOTPRINTS,
                         help='footprint to draw')
-    parser.add_argument('--flavor',default='object',type=str,
+    parser.add_argument('--flavor',default='object|standard',type=str,
                         help='exposure type [object,zero,dome flat,etc.]')
     parser.add_argument('-i','--infile',default=None,
                         help='list of exposures to draw')

@@ -1,1 +1,1 @@
-../data/maglites-poly.txt
+../pointing/data/maglites-poly.txt
