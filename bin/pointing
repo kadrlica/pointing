@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
 # Simple shell script to call pointing in the background
-source $(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/setup.sh
-pointing.py "$@"
+dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+source $dir/setup.sh
+$dir/pointing.py "$@"

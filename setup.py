@@ -36,7 +36,7 @@ setup(
         'setuptools',
     ],
     packages=['pointing'],
-    package_data={'pointing':['data/*.txt']},
+    package_data={'pointing':['data/*.txt','data/*.dat']},
     description=DESC,
     long_description=LONG_DESC,
     platforms='any',

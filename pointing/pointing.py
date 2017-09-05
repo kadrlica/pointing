@@ -89,6 +89,9 @@ CTIO = ephem.Observer()
 CTIO.lon,CTIO.lat = str(TEL_LON),str(TEL_LAT)
 CTIO.elevation = TEL_HEIGHT
 
+def get_datadir():
+    return os.path.join(os.path.dirname(os.path.realpath(__file__)),'data')
+
 # Stupid timezone definition
 ZERO = timedelta(0)
 HOUR = timedelta(hours=1)
@@ -224,8 +227,8 @@ def draw_des(bmap,**kwargs):
     """
     # Plot the wide-field survey footprint
     logging.debug("Plotting footprint: %s"%opts.footprint)
-    basedir = os.path.dirname(os.path.abspath(__file__))
-    infile = os.path.join(basedir,'round13-poly.txt')
+    #basedir = os.path.dirname(os.path.abspath(__file__))
+    infile = os.path.join(get_datadir(),'round13-poly.txt')
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float)])
     proj = safe_proj(bmap,perim['ra'],perim['dec'])
     bmap.plot(*proj,**kwargs)
@@ -271,8 +274,8 @@ def draw_des_sn(bmap,**kwargs):
         plt.gca().annotate(k,bmap(*v),**sntxt_kwargs)
 
 def draw_smash(bmap,**kwargs):
-    basedir = os.path.dirname(os.path.abspath(__file__))
-    filename = os.path.join(basedir,'smash_fields_final.txt')
+    #basedir = os.path.dirname(os.path.abspath(__file__))
+    filename = os.path.join(get_datadir(),'smash_fields_final.txt')
 
     smash=np.genfromtxt(filename,dtype=[('ra',float),('dec',float)],usecols=[4,5])
     smash_x,smash_y = safe_proj(bmap,smash['ra'],smash['dec'])
@@ -282,8 +285,8 @@ def draw_smash(bmap,**kwargs):
 def draw_maglites(bmap,**kwargs):
     # Plot the wide-field survey footprint
     logging.debug("Plotting MagLiteS footprint")
-    basedir = os.path.dirname(os.path.abspath(__file__))
-    infile = os.path.join(basedir,'maglites-poly.txt')
+    #basedir = os.path.dirname(os.path.abspath(__file__))
+    infile = os.path.join(get_datadir(),'maglites-poly.txt')
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float)])
     proj = safe_proj(bmap,perim['ra'],perim['dec'])
     bmap.plot(*proj,**kwargs)
@@ -304,8 +307,8 @@ def draw_bliss(bmap,**kwargs):
     """
     # Plot the wide-field survey footprint
     logging.debug("Plotting footprint: %s"%opts.footprint)
-    basedir = os.path.dirname(os.path.abspath(__file__))
-    infile = os.path.join(basedir,'bliss-poly.txt')
+    #basedir = os.path.dirname(os.path.abspath(__file__))
+    infile = os.path.join(get_datadir(),'bliss-poly.txt')
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float),('poly',int)])
     for p in np.unique(perim['poly']):
         sel = (perim['poly'] == p)
