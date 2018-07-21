@@ -12,6 +12,6 @@ else
   set basedir = `dirname $0`
 endif
 
-setenv PLOTPOINTINGS_DIR `cd $basedir/.. && pwd`
-setenv PATH ${PLOTPOINTINGS_DIR}/bin:${PATH}
-setenv PYTHONPATH ${PLOTPOINTINGS_DIR}/python/PlotPointings:${PYTHONPATH}
+setenv POINTING_DIR `cd $basedir/.. && pwd`
+setenv PATH ${POINTING_DIR}/bin:${PATH}
+setenv PYTHONPATH ${POINTING_DIR}/python/PlotPointings:${PYTHONPATH}

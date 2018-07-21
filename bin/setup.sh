@@ -6,6 +6,6 @@
 #setup ephem
 #setup matplotlib
 
-export PLOTPOINTINGS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-export PATH=${PLOTPOINTINGS_DIR}/bin:${PATH}
-export PYTHONPATH=${PLOTPOINTINGS_DIR}/python/PlotPointings:${PYTHONPATH}
+POINTING_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+export PATH=${POINTING_DIR}/bin:${PATH}
+#export PYTHONPATH=${POINTING_DIR}/python/PlotPointings:${PYTHONPATH}
