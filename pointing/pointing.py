@@ -74,7 +74,7 @@ SN_LABELS = odict([
 ])
 
 # The allowed footprint outlines
-FOOTPRINTS = ['none','des','des-sn','smash','maglites','bliss']
+FOOTPRINTS = ['none','des','des-sn','smash','maglites','bliss','decals']
 
 # CTIO location taken from:
 #http://www.ctio.noao.edu/noao/content/Coordinates-Observatories-Cerro-Tololo-and-Cerro-Pachon
@@ -130,7 +130,7 @@ def load_data(opts):
         # Use the FNAL mirror to avoid overloading CTIO
         try: from database import Database
         except ImportError: from pointing.database import Database
-        db = Database(dbname='db-fnal')
+        db = Database(dbname='db-'+opts.db)
         db.connect()
         query = "SELECT %s FROM exposure WHERE %s"%(','.join(selection),filter)
         #query = "SELECT id as expnum,telra as ra,teldec as dec,filter as band FROM exposure WHERE exposed = TRUE AND flavor LIKE 'object' and telra between 80 and 82 AND teldec between -71 and -69"
@@ -228,7 +228,7 @@ def draw_des(bmap,**kwargs):
     # Plot the wide-field survey footprint
     logging.debug("Plotting footprint: %s"%opts.footprint)
     #basedir = os.path.dirname(os.path.abspath(__file__))
-    infile = os.path.join(get_datadir(),'round13-poly.txt')
+    infile = os.path.join(get_datadir(),'des-round17-poly.txt')
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float)])
     proj = safe_proj(bmap,perim['ra'],perim['dec'])
     bmap.plot(*proj,**kwargs)
@@ -291,6 +291,11 @@ def draw_maglites(bmap,**kwargs):
     proj = safe_proj(bmap,perim['ra'],perim['dec'])
     bmap.plot(*proj,**kwargs)
 
+    infile = os.path.join(get_datadir(),'maglitesII-poly.txt')
+    perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float)])
+    proj = safe_proj(bmap,perim['ra'],perim['dec'])
+    bmap.plot(*proj,**kwargs)
+
 
 def draw_bliss(bmap,**kwargs):
     """
@@ -309,6 +314,28 @@ def draw_bliss(bmap,**kwargs):
     logging.debug("Plotting footprint: %s"%opts.footprint)
     #basedir = os.path.dirname(os.path.abspath(__file__))
     infile = os.path.join(get_datadir(),'bliss-poly.txt')
+    perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float),('poly',int)])
+    for p in np.unique(perim['poly']):
+        sel = (perim['poly'] == p)
+        proj = safe_proj(bmap,perim[sel]['ra'],perim[sel]['dec'])
+        bmap.plot(*proj,**kwargs)
+
+def draw_decals(bmap,**kwargs):
+    """
+    Plot the DECaLS wide-field footprint.
+
+    Parameters:
+    -----------
+    bmap   : The basemap object
+    kwargs : Various plotting arguments
+
+    Returns:
+    --------
+    None
+    """
+    # Plot the wide-field survey footprint
+    logging.debug("Plotting footprint: %s"%opts.footprint)
+    infile = os.path.join(get_datadir(),'decals-poly.txt')
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float),('poly',int)])
     for p in np.unique(perim['poly']):
         sel = (perim['poly'] == p)
@@ -469,10 +496,11 @@ def plot(opts):
 
     # Plot footprint(s)
     fp_zorder=exp_zorder-1
+    fp_kwargs=dict(marker='o',mew=0,mfc='none',color='k',lw=2,zorder=fp_zorder)
     if 'none' in opts.footprint:
         opts.footprint = ['none']
     if 'des' in opts.footprint:
-        des_kwargs = dict(marker='o',mew=0,mfc='none',color='b',lw=2,zorder=fp_zorder)
+        des_kwargs = dict(fp_kwargs,color='b')
         draw_des(m,**des_kwargs)
     if 'des' in opts.footprint or 'des-sn' in opts.footprint:
         sn_kwargs = dict(facecolor='none',edgecolor='b',projection=proj_kwargs['projection'],zorder=fp_zorder)
@@ -482,11 +510,14 @@ def plot(opts):
         smash_kwargs.update(zorder=exp_zorder+1)
         draw_smash(m,**smash_kwargs)
     if 'maglites' in opts.footprint:
-        maglites_kwargs = dict(marker='o',mew=0,mfc='none',color='r',lw=2,zorder=fp_zorder)
+        maglites_kwargs = dict(fp_kwargs,color='r')
         draw_maglites(m,**maglites_kwargs)
     if 'bliss' in opts.footprint:
-        bliss_kwargs = dict(marker='o',mew=0,mfc='none',color='m',lw=2,zorder=fp_zorder)
+        bliss_kwargs = dict(fp_kwargs,color='m')
         draw_bliss(m,**bliss_kwargs)
+    if 'decals' in opts.footprint:
+        decals_kwargs = dict(fp_kwargs,color='k')
+        draw_decals(m,**decals_kwargs)
 
     # Annotate with some information
     if opts.legend:
@@ -540,6 +571,8 @@ if __name__ == "__main__":
                         help='draw exposures in specific band')
     parser.add_argument('-c','--color',default=True,type=boolean,
                         help='color corresponding to filter')
+    parser.add_argument('--db',default='ctio',choices=['ctio','fnal'],
+                        help='database to query for exposures')
     parser.add_argument('-f','--footprint',action='append',choices=FOOTPRINTS,
                         help='footprint to draw')
     parser.add_argument('--flavor',default='object|standard',type=str,
