@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-"""
-Where you at?
-"""
+""" Where you at? """
 import sys,os
 import logging
 from collections import OrderedDict as odict
@@ -19,7 +17,7 @@ import ephem
 
 __author__  = "Alex Drlica-Wagner"
 __email__   = "kadrlica@fnal.gov"
-__version__ ='2.1.0'
+__version__ = "2.1.0"
 
 MAXREF=5000 # Maximum number of refreshes
 DECAM=1.1 # DECam radius (deg)
@@ -42,6 +40,7 @@ COLORS = odict([
     ('VR','gray'),
 ])
 
+# Allowed map projections
 PROJ = odict([
     ('ortho'  , dict(projection='ortho',celestial=True)),
     ('moll'   , dict(projection='moll',celestial=True)),
@@ -85,11 +84,13 @@ TEL_LON = -70.80653
 TEL_LAT = -30.169647
 TEL_HEIGHT = 2213
 
+# Create the observatory object
 CTIO = ephem.Observer()
 CTIO.lon,CTIO.lat = str(TEL_LON),str(TEL_LAT)
 CTIO.elevation = TEL_HEIGHT
 
 def get_datadir():
+    """ Path to data directory. """
     return os.path.join(os.path.dirname(os.path.realpath(__file__)),'data')
 
 # Stupid timezone definition
@@ -118,7 +119,16 @@ def airmass_angle(x=1.4):
     return 90.-np.degrees(np.arcsin(1./x))
 
 def load_data(opts):
-    """ Load the data (either from DB of file). """
+    """ Load the data (either from DB of file). 
+
+    Parameters:
+    -----------
+    opts : command line options
+    
+    Returns:
+    --------
+    data : numpy recarray
+    """
     since = parse_since(opts.since)
     propid = '%' if opts.propid is None else opts.propid
     dtype=[('expnum',int),('telra',float),('teldec',float),('filter',object)]
@@ -144,6 +154,7 @@ def load_data(opts):
         return np.loadtxt(opts.infile,dtype=dtype)
 
 def mjd(datetime):
+    """ Modified Julian Date (MJD) """
     mjd_epoch = dateutil.parser.parse('1858-11-17T00:00:00Z')
     mjd_date = (datetime-mjd_epoch).total_seconds()/float(24*60*60)
     return mjd_date
@@ -155,7 +166,16 @@ def lmst(observatory):
     return lmst
 
 def moon(datetime):
-    """ Moon location """
+    """ Moon location 
+    
+    Parameters:
+    -----------
+    datetime : the datetime of moon location request
+    
+    Returns:
+    --------
+    (ra, dec), phase : moon parameters [(deg, deg), %]
+    """
     moon = ephem.Moon()
     moon.compute(CTIO)
     moon_phase = moon.moon_phase * 100
@@ -173,6 +193,7 @@ def boolean(string):
         raise ValueError()
 
 def splash_screen():
+    """ Splash text to print """
     splash = """Running Alex Drlica-Wagner's DECam pointing script..."""
     logging.info(splash)
 
@@ -201,6 +222,7 @@ def parse_since(value):
     return since
 
 def draw_constellation(proj,name):
+    """ Draw a map of the constellations (work in progress). """
     from constellations import CONSTELLATIONS
     points = np.array(CONSTELLATIONS[name])
 
@@ -274,7 +296,17 @@ def draw_des_sn(bmap,**kwargs):
         plt.gca().annotate(k,bmap(*v),**sntxt_kwargs)
 
 def draw_smash(bmap,**kwargs):
-    #basedir = os.path.dirname(os.path.abspath(__file__))
+    """ Draw the SMASH fields 
+
+    Parameters:
+    -----------
+    bmap   : The basemap object
+    kwargs : Various plotting arguments
+
+    Returns:
+    --------
+    None
+    """
     filename = os.path.join(get_datadir(),'smash_fields_final.txt')
 
     smash=np.genfromtxt(filename,dtype=[('ra',float),('dec',float)],usecols=[4,5])
@@ -283,19 +315,47 @@ def draw_smash(bmap,**kwargs):
     bmap.scatter(smash_x,smash_y,color='k',**kwargs)
 
 def draw_maglites(bmap,**kwargs):
+    """
+    Plot the MagLiteS Phase-I footprint.
+
+    Parameters:
+    -----------
+    bmap   : The basemap object
+    kwargs : Various plotting arguments
+
+    Returns:
+    --------
+    None
+    """
+
     # Plot the wide-field survey footprint
     logging.debug("Plotting MagLiteS footprint")
-    #basedir = os.path.dirname(os.path.abspath(__file__))
     infile = os.path.join(get_datadir(),'maglites-poly.txt')
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float)])
     proj = safe_proj(bmap,perim['ra'],perim['dec'])
     bmap.plot(*proj,**kwargs)
 
-    infile = os.path.join(get_datadir(),'maglitesII-poly.txt')
-    perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float)])
-    proj = safe_proj(bmap,perim['ra'],perim['dec'])
-    bmap.plot(*proj,**kwargs)
+def draw_maglites2(bmap,**kwargs):
+    """
+    Plot the MagLiteS Phase-II footprint.
 
+    Parameters:
+    -----------
+    bmap   : The basemap object
+    kwargs : Various plotting arguments
+
+    Returns:
+    --------
+    None
+    """
+    # Plot the wide-field survey footprint
+    logging.debug("Plotting footprint: %s"%opts.footprint)
+    infile = os.path.join(get_datadir(),'maglitesII-poly.txt')
+    perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float),('poly',int)])
+    for p in np.unique(perim['poly']):
+        sel = (perim['poly'] == p)
+        proj = safe_proj(bmap,perim[sel]['ra'],perim[sel]['dec'])
+        bmap.plot(*proj,**kwargs)
 
 def draw_bliss(bmap,**kwargs):
     """
@@ -312,7 +372,6 @@ def draw_bliss(bmap,**kwargs):
     """
     # Plot the wide-field survey footprint
     logging.debug("Plotting footprint: %s"%opts.footprint)
-    #basedir = os.path.dirname(os.path.abspath(__file__))
     infile = os.path.join(get_datadir(),'bliss-poly.txt')
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float),('poly',int)])
     for p in np.unique(perim['poly']):
@@ -344,7 +403,17 @@ def draw_decals(bmap,**kwargs):
 
 
 def plot(opts):
-    """ Core plotting function.
+    """ 
+    Core plotting function. Creates the basemap, overplots all of the
+    requested features, and returns the map object.
+
+    Parameters:
+    -----------
+    opts : command line options
+    
+    Returns:
+    --------
+    m : the basemap object
     """
     utc = parse_utc(opts.utc)
     CTIO.date = utc
@@ -352,7 +421,6 @@ def plot(opts):
 
     # Grab the data
     data = load_data(opts)
-    #data =  np.rec.recarray(0,dtype=dtype)
 
     # Subselect the data
     sel = np.in1d(data['filter'],FILTERS)
@@ -512,11 +580,12 @@ def plot(opts):
     if 'maglites' in opts.footprint:
         maglites_kwargs = dict(fp_kwargs,color='r')
         draw_maglites(m,**maglites_kwargs)
+        draw_maglites2(m,**maglites_kwargs)
     if 'bliss' in opts.footprint:
         bliss_kwargs = dict(fp_kwargs,color='m')
         draw_bliss(m,**bliss_kwargs)
     if 'decals' in opts.footprint:
-        decals_kwargs = dict(fp_kwargs,color='k')
+        decals_kwargs = dict(fp_kwargs,color='darkorange')
         draw_decals(m,**decals_kwargs)
 
     # Annotate with some information
