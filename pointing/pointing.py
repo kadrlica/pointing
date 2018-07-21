@@ -17,7 +17,7 @@ import ephem
 
 __author__  = "Alex Drlica-Wagner"
 __email__   = "kadrlica@fnal.gov"
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 MAXREF=5000 # Maximum number of refreshes
 DECAM=1.1 # DECam radius (deg)
