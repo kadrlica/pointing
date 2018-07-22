@@ -17,17 +17,18 @@ import ephem
 
 __author__  = "Alex Drlica-Wagner"
 __email__   = "kadrlica@fnal.gov"
-__version__ = "2.1.1"
+__version__ = "2.1.2"
 
 MAXREF=5000 # Maximum number of refreshes
-DECAM=1.1 # DECam radius (deg)
+DECAM=1.1   # DECam radius (deg)
+
 # Accurate DECam marker size depends on figsize and DPI
+# This is a mess...
 FIGSIZE=(10.5,8.5)
 SCALE=np.sqrt((8.0*6.0)/(FIGSIZE[0]*FIGSIZE[1]))
 DPI=80;
 
 FILTERS = ['u','g','r','i','z','Y','VR']
-#FILTERS = FILTERS[::-1]
 BANDS = FILTERS + ['all']
 COLORS = odict([
     ('none','black'),
@@ -46,9 +47,9 @@ PROJ = odict([
     ('moll'   , dict(projection='moll',celestial=True)),
     ('mol'    , dict(projection='moll',celestial=True)),
     ('ait'    , dict(projection='hammer',celestial=True)),
-    ('mbtfpq' , dict(projection='mbtfpq',celestial=True)),
     ('mbt'    , dict(projection='mbtfpq',celestial=True)),
-    ('mcbride', dict(projection='mbtfpq',celestial=True)),
+    ('mbtfpq' , dict(projection='mbtfpq',celestial=True)),
+    ('mcbryde', dict(projection='mbtfpq',celestial=True)),
 ])
 
 # Derived from telra,teldec of 10000 exposures
@@ -107,12 +108,25 @@ class UTC(tzinfo):
     def dst(self, dt):
         return ZERO
 
-def safe_proj(proj,lon,lat):
-    """ Remove points outside of projection """
-    x,y = proj(np.asarray(lon),np.asarray(lat))
-    x[x > 1e29] = None
-    y[y > 1e29] = None
+def safe_proj(bmap,lon,lat,inverse=False):
+    """ Remove points outside of projection 
+    
+    Parameters:
+    -----------
+    bmap : basemap
+    lon  : longitude
+    lat  : latitude
+    inverse : inverse projection
+
+    Returns:
+    --------
+    x,y : projected coordinates    
+    """
+    x,y = bmap(np.atleast_1d(lon),np.atleast_1d(lat),inverse=inverse)
+    x[np.abs(x) > 1e29] = None
+    y[np.abs(y) > 1e29] = None
     return x,y
+
 
 def airmass_angle(x=1.4):
     """ Zenith angle for a given airmass limit """
@@ -221,7 +235,7 @@ def parse_since(value):
     logging.debug("Since: %s"%since.strftime('%Y-%m-%d %H:%M:%S'))
     return since
 
-def draw_constellation(proj,name):
+def draw_constellation(bmap,name):
     """ Draw a map of the constellations (work in progress). """
     from constellations import CONSTELLATIONS
     points = np.array(CONSTELLATIONS[name])
@@ -230,7 +244,7 @@ def draw_constellation(proj,name):
     radeg = points[:,1] * 1.0 / 1800 * 15
     decdeg = points[:,2] * 1.0 / 60
     print radeg,decdeg
-    verts = zip(safe_proj(proj,radeg,decdeg))
+    verts = zip(safe_proj(bmap,radeg,decdeg))
     codes = [XEPHEM2PATH[c] for c in points[:,0]]
     print x,y
 
@@ -476,6 +490,13 @@ def plot(opts):
     proj_kwargs.update(lon_0=lon_0,lat_0=lat_0)
 
     m = basemap.Basemap(**proj_kwargs)
+    def format_coord(x,y):
+        #Format matplotlib cursor to display RA, Dec
+        lon,lat = safe_proj(m,x,y,inverse=True)
+        lon += 360*(lon < 0)
+        return 'ra=%1.3f, dec=%1.3f'%(lon,lat)
+    plt.gca().format_coord = format_coord
+
     parallels = np.arange(-90.,120.,30.)
     m.drawparallels(parallels)
     meridians = np.arange(0.,420.,60.)
