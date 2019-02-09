@@ -661,7 +661,7 @@ if __name__ == "__main__":
                         help='draw exposures in specific band')
     parser.add_argument('-c','--color',default=True,type=boolean,
                         help='color corresponding to filter')
-    parser.add_argument('--db',default='ctio',choices=['ctio','fnal'],
+    parser.add_argument('--db',default='fnal',choices=['ctio','fnal'],
                         help='database to query for exposures')
     parser.add_argument('-f','--footprint',action='append',choices=FOOTPRINTS,
                         help='footprint to draw')
