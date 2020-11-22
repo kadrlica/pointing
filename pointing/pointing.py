@@ -74,7 +74,7 @@ SN_LABELS = odict([
 ])
 
 # The allowed footprint outlines
-FOOTPRINTS = ['none','des','des-sn','smash','maglites','bliss','decals']
+FOOTPRINTS = ['none','des','des-sn','smash','maglites','bliss','decals','mw']
 
 # CTIO location taken from:
 #http://www.ctio.noao.edu/noao/content/Coordinates-Observatories-Cerro-Tololo-and-Cerro-Pachon
@@ -93,6 +93,57 @@ CTIO.elevation = TEL_HEIGHT
 def get_datadir():
     """ Path to data directory. """
     return os.path.join(os.path.dirname(os.path.realpath(__file__)),'data')
+
+
+def gal2cel(glon, glat):
+    """
+    Converts Galactic (deg) to Celestial J2000 (deg) coordinates
+    """
+    glat = np.radians(glat)
+    sin_glat = np.sin(glat)
+    cos_glat = np.cos(glat)
+
+    glon = np.radians(glon)
+    ra_gp = np.radians(192.85948)
+    de_gp = np.radians(27.12825)
+    lcp = np.radians(122.932)
+
+    sin_lcp_glon = np.sin(lcp - glon)
+    cos_lcp_glon = np.cos(lcp - glon)
+
+    sin_d = (np.sin(de_gp) * sin_glat) \
+            + (np.cos(de_gp) * cos_glat * cos_lcp_glon)
+    ramragp = np.arctan2(cos_glat * sin_lcp_glon,
+                         (np.cos(de_gp) * sin_glat) \
+                         - (np.sin(de_gp) * cos_glat * cos_lcp_glon))
+    dec = np.arcsin(sin_d)
+    ra = (ramragp + ra_gp + (2. * np.pi)) % (2. * np.pi)
+    return np.degrees(ra), np.degrees(dec)
+
+def cel2gal(ra, dec):
+    """
+    Converts Celestial J2000 (deg) to Calactic (deg) coordinates
+    """
+    dec = np.radians(dec)
+    sin_dec = np.sin(dec)
+    cos_dec = np.cos(dec)
+
+    ra = np.radians(ra)
+    ra_gp = np.radians(192.85948)
+    de_gp = np.radians(27.12825)
+
+    sin_ra_gp = np.sin(ra - ra_gp)
+    cos_ra_gp = np.cos(ra - ra_gp)
+
+    lcp = np.radians(122.932)
+    sin_b = (np.sin(de_gp) * sin_dec) \
+            + (np.cos(de_gp) * cos_dec * cos_ra_gp)
+    lcpml = np.arctan2(cos_dec * sin_ra_gp,
+                       (np.cos(de_gp) * sin_dec) \
+                       - (np.sin(de_gp) * cos_dec * cos_ra_gp))
+    glat = np.arcsin(sin_b)
+    glon = (lcp - lcpml + (2. * np.pi)) % (2. * np.pi)
+    return np.degrees(glon), np.degrees(glat)
 
 # Stupid timezone definition
 ZERO = timedelta(0)
@@ -247,6 +298,27 @@ def draw_constellation(bmap,name):
     verts = zip(safe_proj(bmap,radeg,decdeg))
     codes = [XEPHEM2PATH[c] for c in points[:,0]]
     print x,y
+
+def draw_milky_way(bmap,width=10,**kwargs):
+    """ Draw the Milky Way galaxy. """
+    defaults = dict(color='k',lw=1.5,ls='-')
+    for k,v in defaults.items():
+        kwargs.setdefault(k,v)
+
+    glon = np.linspace(0,360,500)
+    glat = np.zeros_like(glon)
+    ra,dec = gal2cel(glon,glat)
+    ra -= 360*(ra > 180)
+
+    proj = safe_proj(bmap,ra,dec)
+    bmap.plot(*proj,**kwargs)
+
+    if width:
+        kwargs.update(dict(ls='--',lw=1))
+        for delta in [+width,-width]:
+            ra,dec = gal2cel(glon,glat+delta)
+            proj = safe_proj(bmap,ra,dec)
+            bmap.plot(*proj,**kwargs)
 
 def draw_des(bmap,**kwargs):
     """
@@ -608,6 +680,10 @@ def plot(opts):
     if 'decals' in opts.footprint:
         decals_kwargs = dict(fp_kwargs,color='darkorange')
         draw_decals(m,**decals_kwargs)
+    if 'mw' in opts.footprint:
+        mw_kwargs = dict(color='k')
+        draw_milky_way(m,**mw_kwargs)
+
 
     # Annotate with some information
     if opts.legend:
