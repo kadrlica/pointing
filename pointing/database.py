@@ -72,4 +72,4 @@ if __name__ == "__main__":
 
     db = Database()
     db.connect()
-    print db
+    print(db)

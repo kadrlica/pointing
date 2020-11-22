@@ -313,10 +313,10 @@ def draw_constellation(bmap,name):
     drawtype = points[:,0]
     radeg = points[:,1] * 1.0 / 1800 * 15
     decdeg = points[:,2] * 1.0 / 60
-    print radeg,decdeg
+    print(radeg,decdeg)
     verts = zip(safe_proj(bmap,radeg,decdeg))
     codes = [XEPHEM2PATH[c] for c in points[:,0]]
-    print x,y
+    print(x,y)
 
 def draw_milky_way(bmap,width=10,**kwargs):
     """ Draw the Milky Way galaxy. """
