@@ -74,7 +74,7 @@ SN_LABELS = odict([
 ])
 
 # The allowed footprint outlines
-FOOTPRINTS = ['none','des','des-sn','smash','maglites','bliss','decals','mw']
+FOOTPRINTS = ['none','des','des-sn','smash','maglites','bliss','decals','delve']
 
 # CTIO location taken from:
 #http://www.ctio.noao.edu/noao/content/Coordinates-Observatories-Cerro-Tololo-and-Cerro-Pachon
@@ -94,6 +94,11 @@ def get_datadir():
     """ Path to data directory. """
     return os.path.join(os.path.dirname(os.path.realpath(__file__)),'data')
 
+def setdefaults(kwargs,defaults):
+    """ set dictionary with defaults. """
+    for k,v in defaults.items():
+        kwargs.setdefault(k,v)
+    return kwargs
 
 def gal2cel(glon, glat):
     """
@@ -177,6 +182,20 @@ def safe_proj(bmap,lon,lat,inverse=False):
     x[np.abs(x) > 1e29] = None
     y[np.abs(y) > 1e29] = None
     return x,y
+
+def get_boundary(bmap,projection,fact=0.99):
+    # Check that point inside boundary
+    # Doesn't work for 'ait' and 'moll' projections
+    if projection in basemap._pseudocyl:
+        # This was estimated by eye...
+        rminor=9.00995e6; rmajor = 2*rminor
+        boundary = Ellipse((rmajor,rminor),
+                           2*(fact*rmajor),2*(fact*rminor))
+    else:
+        boundary = Ellipse((bmap.rmajor,bmap.rminor),
+                           2*(fact*bmap.rmajor),2*(fact*bmap.rminor))
+
+    return boundary
 
 
 def airmass_angle(x=1.4):
@@ -302,9 +321,9 @@ def draw_constellation(bmap,name):
 def draw_milky_way(bmap,width=10,**kwargs):
     """ Draw the Milky Way galaxy. """
     defaults = dict(color='k',lw=1.5,ls='-')
-    for k,v in defaults.items():
-        kwargs.setdefault(k,v)
+    setdefaults(kwargs,defaults)
 
+    logging.debug("Plotting the Milky Way")
     glon = np.linspace(0,360,500)
     glat = np.zeros_like(glon)
     ra,dec = gal2cel(glon,glat)
@@ -336,7 +355,7 @@ def draw_des(bmap,**kwargs):
     # Plot the wide-field survey footprint
     logging.debug("Plotting footprint: %s"%opts.footprint)
     #basedir = os.path.dirname(os.path.abspath(__file__))
-    infile = os.path.join(get_datadir(),'des-round17-poly.txt')
+    infile = os.path.join(get_datadir(),'des-round19-poly.txt')
     perim = np.loadtxt(infile,dtype=[('ra',float),('dec',float)])
     proj = safe_proj(bmap,perim['ra'],perim['dec'])
     bmap.plot(*proj,**kwargs)
@@ -356,18 +375,8 @@ def draw_des_sn(bmap,**kwargs):
     """
     # Plot the SN fields
     logging.debug("Plotting DES supernova fields.")
-    # Check that point inside boundary
-    # Doesn't work for 'ait' and 'moll' projections
-    fact = 0.99
-    projection = kwargs.pop('projection',None)
-    if projection in basemap._pseudocyl:
-        # This was estimated by eye...
-        rminor=9.00995e6; rmajor = 2*rminor
-        boundary = Ellipse((rmajor,rminor),
-                           2*(fact*rmajor),2*(fact*rminor))
-    else:
-        boundary = Ellipse((bmap.rmajor,bmap.rminor),
-                           2*(fact*bmap.rmajor),2*(fact*bmap.rminor))
+
+    boundary = get_boundary(bmap,kwargs.pop('projection',None),fact=0.99)
     for v in SN.values():
         if not boundary.contains_point(bmap(*v)):
             continue
@@ -487,6 +496,37 @@ def draw_decals(bmap,**kwargs):
         proj = safe_proj(bmap,perim[sel]['ra'],perim[sel]['dec'])
         bmap.plot(*proj,**kwargs)
 
+def draw_delve(bmap,**kwargs):
+    """ Draw DELVE footprint """
+    defaults=dict(color='red', lw=2)
+    setdefaults(kwargs,defaults)
+
+    logging.debug("Plotting footprint: %s"%opts.footprint)
+    deep = odict([
+        ('SextansB', (150.00,   5.33, 3.0)),
+        ('IC5152',   (330.67, -51.30, 3.0)),
+        ('NGC300',   ( 13.72, -37.68, 3.0)),
+        ('NGC55',    (  3.79, -39.22, 3.0)),
+    ])
+    boundary = get_boundary(bmap,kwargs.pop('projection',None),fact=0.98)
+
+    for ra,dec,radius in deep.values():
+        if not boundary.contains_point(bmap(ra,dec)): continue
+        # This does the projection correctly, but fails at boundary
+        bmap.tissot(ra,dec,radius,100,fc='none',edgecolor=kwargs['color'],lw=kwargs['lw'])
+
+    #for ra,dec,radius in deep.values():
+    #    # This doesn't deal with boundaries well
+    #    #self.tissot(ra, dec, radius, 100, fc='none',**kwargs)
+    #    x,y = safe_proj(bmap,np.array([ra]), np.array([dec]))
+    #    bmap.scatter(x,y,facecolor='none',edgecolor=kwargs['color'],lw=2,s=400)
+
+    filename = os.path.join(get_datadir(),'delve-poly.txt')
+    perim = np.loadtxt(filename,dtype=[('ra',float),('dec',float),('poly',int)])
+    for p in np.unique(perim['poly']):
+        sel = (perim['poly'] == p)
+        proj = safe_proj(bmap,perim[sel]['ra'],perim[sel]['dec'])
+        bmap.plot(*proj,**kwargs)
 
 def plot(opts):
     """ 
@@ -561,30 +601,30 @@ def plot(opts):
 
     proj_kwargs.update(lon_0=lon_0,lat_0=lat_0)
 
-    m = basemap.Basemap(**proj_kwargs)
+    bmap = basemap.Basemap(**proj_kwargs)
     def format_coord(x,y):
         #Format matplotlib cursor to display RA, Dec
-        lon,lat = safe_proj(m,x,y,inverse=True)
+        lon,lat = safe_proj(bmap,x,y,inverse=True)
         lon += 360*(lon < 0)
         return 'ra=%1.3f, dec=%1.3f'%(lon,lat)
     plt.gca().format_coord = format_coord
 
     parallels = np.arange(-90.,120.,30.)
-    m.drawparallels(parallels)
+    bmap.drawparallels(parallels)
     meridians = np.arange(0.,420.,60.)
-    m.drawmeridians(meridians)
+    bmap.drawmeridians(meridians)
     for mer in meridians[:-1]:
-        plt.annotate(r'$%i^{\circ}$'%mer,m(mer,5),ha='center')
+        plt.annotate(r'$%i^{\circ}$'%mer,bmap(mer,5),ha='center')
     plt.annotate('West',xy=(1.0,0.5),ha='left',xycoords='axes fraction')
     plt.annotate('East',xy=(0.0,0.5),ha='right',xycoords='axes fraction')
 
     # markersize defined at minimum distortion point
     if proj_kwargs['projection'] in basemap._pseudocyl:
-        x1,y1=ax.transData.transform(m(lon_0,lat_0+DECAM))
-        x2,y2=ax.transData.transform(m(lon_0,lat_0-DECAM))
+        x1,y1=ax.transData.transform(bmap(lon_0,lat_0+DECAM))
+        x2,y2=ax.transData.transform(bmap(lon_0,lat_0-DECAM))
     else:
-        x1,y1=ax.transData.transform(m(lon_zen,lat_zen+DECAM))
-        x2,y2=ax.transData.transform(m(lon_zen,lat_zen-DECAM))
+        x1,y1=ax.transData.transform(bmap(lon_zen,lat_zen+DECAM))
+        x2,y2=ax.transData.transform(bmap(lon_zen,lat_zen-DECAM))
 
     # Since markersize defined in "points" in scales with figsize/dpi
     size = SCALE * (y1-y2)**2
@@ -594,17 +634,17 @@ def plot(opts):
     exp_kwargs = dict(s=size,marker='H',zorder=exp_zorder,edgecolor='k',lw=1)
 
     # Projected exposure locations
-    x,y = safe_proj(m,telra,teldec)
+    x,y = safe_proj(bmap,telra,teldec)
 
     # Plot exposure of interest
     if len(data):
         logging.debug("Plotting exposure: %i (%3.2f,%3.2f)"%(expnum[idx],telra[idx],teldec[idx]))
         # Hacked path effect (fix if matplotlib is updated)
-        m.scatter(x[idx],y[idx],color='w',**dict(exp_kwargs,edgecolor='w',s=70,lw=2))
-        m.scatter(x[idx],y[idx],color=color,**dict(exp_kwargs,alpha=1.0,linewidth=2))
+        bmap.scatter(x[idx],y[idx],color='w',**dict(exp_kwargs,edgecolor='w',s=70,lw=2))
+        bmap.scatter(x[idx],y[idx],color=color,**dict(exp_kwargs,alpha=1.0,linewidth=2))
 
     # Once matplotlib is updated
-    #x = m.scatter(x[idx],y[idx],color=color,**exp_kwargs)
+    #x = bmap.scatter(x[idx],y[idx],color=color,**exp_kwargs)
     #ef = patheffects.withStroke(foreground="w", linewidth=3)
     #x.set_path_effects([ef])
 
@@ -615,23 +655,23 @@ def plot(opts):
     exp_slice = slice(None,opts.numexp)
     numexp = len(x[exp_slice])
     logging.debug("Plotting last %s exposures"%(numexp))
-    m.scatter(x[exp_slice],y[exp_slice],color=color[exp_slice],**nexp_kwargs)
+    bmap.scatter(x[exp_slice],y[exp_slice],color=color[exp_slice],**nexp_kwargs)
 
     # Plot zenith position & focal plane scale
-    zen_x,zen_y = m(lon_zen,lat_zen)
+    zen_x,zen_y = bmap(lon_zen,lat_zen)
     #zen_kwargs = dict(color='green',alpha=0.75,lw=1,zorder=0)
     zen_kwargs = dict(color='green',alpha=0.75,lw=1,zorder=1000)
     if opts.zenith:
         logging.debug("Plotting zenith: (%.2f,%.2f)"%(lon_zen,lat_zen))
-        m.plot(zen_x,zen_y,'+',ms=10,**zen_kwargs)
+        bmap.plot(zen_x,zen_y,'+',ms=10,**zen_kwargs)
         logging.debug("Plotting focal plane scale.")
-        m.tissot(lon_zen, lat_zen, DECAM, 100, fc='none', **zen_kwargs)
+        bmap.tissot(lon_zen, lat_zen, DECAM, 100, fc='none', **zen_kwargs)
 
         # To test exposure size
-        #m.tissot(lon_zen, lat_zen, DECAM, 100, fc='none', **zen_kwargs)
-        #m.scatter(*m(lon_zen,lat_zen),**nexp_kwargs)
-        #m.tissot(0, 0, DECAM, 100, fc='none', **zen_kwargs)
-        #m.scatter(*m(0,0),**nexp_kwargs)
+        #bmap.tissot(lon_zen, lat_zen, DECAM, 100, fc='none', **zen_kwargs)
+        #bmap.scatter(*bmap(lon_zen,lat_zen),**nexp_kwargs)
+        #bmap.tissot(0, 0, DECAM, 100, fc='none', **zen_kwargs)
+        #bmap.scatter(*bmap(0,0),**nexp_kwargs)
 
 
     # Plot airmass circle
@@ -641,7 +681,7 @@ def plot(opts):
     else:
         logging.debug("Plotting airmass: %s"%opts.airmass)
         angle = airmass_angle(opts.airmass)
-        m.tissot(lon_zen, lat_zen, angle, 100, fc='none',**zen_kwargs)
+        bmap.tissot(lon_zen, lat_zen, angle, 100, fc='none',**zen_kwargs)
 
     # Moon location and phase
     (moon_ra,moon_dec),moon_phase = moon(utc)
@@ -650,10 +690,14 @@ def plot(opts):
         moon_txt = '%i%%'%moon_phase
         #bbox = dict(boxstyle='circle,pad=0.4',fc='k',ec='k',alpha=0.25,lw=2)
         moon_kwargs = dict(zorder=exp_zorder-1,fontsize=11,va='center',ha='center',weight='bold')
-        ax.annotate(moon_txt,m(moon_ra,moon_dec),**moon_kwargs)
+        ax.annotate(moon_txt,bmap(moon_ra,moon_dec),**moon_kwargs)
         # Again old matplotlib making things difficult
         moon_kwargs2 = dict(facecolor='k',alpha=0.25,lw=2,s=2000)
-        ax.scatter(*m(moon_ra,moon_dec),**moon_kwargs2)
+        ax.scatter(*bmap(moon_ra,moon_dec),**moon_kwargs2)
+
+    if opts.mw:
+        mw_kwargs = dict(color='k')
+        draw_milky_way(bmap,**mw_kwargs)
 
     # Plot footprint(s)
     fp_zorder=exp_zorder-1
@@ -662,28 +706,27 @@ def plot(opts):
         opts.footprint = ['none']
     if 'des' in opts.footprint:
         des_kwargs = dict(fp_kwargs,color='b')
-        draw_des(m,**des_kwargs)
+        draw_des(bmap,**des_kwargs)
     if 'des' in opts.footprint or 'des-sn' in opts.footprint:
         sn_kwargs = dict(facecolor='none',edgecolor='b',projection=proj_kwargs['projection'],zorder=fp_zorder)
-        draw_des_sn(m,**sn_kwargs)
+        draw_des_sn(bmap,**sn_kwargs)
     if 'smash' in opts.footprint:
         smash_kwargs = dict(facecolor='none',**exp_kwargs)
         smash_kwargs.update(zorder=exp_zorder+1)
-        draw_smash(m,**smash_kwargs)
+        draw_smash(bmap,**smash_kwargs)
     if 'maglites' in opts.footprint:
         maglites_kwargs = dict(fp_kwargs,color='r')
-        draw_maglites(m,**maglites_kwargs)
-        draw_maglites2(m,**maglites_kwargs)
+        draw_maglites(bmap,**maglites_kwargs)
+        draw_maglites2(bmap,**maglites_kwargs)
     if 'bliss' in opts.footprint:
-        bliss_kwargs = dict(fp_kwargs,color='m')
-        draw_bliss(m,**bliss_kwargs)
+        bliss_kwargs = dict(fp_kwargs,color='r')
+        draw_bliss(bmap,**bliss_kwargs)
     if 'decals' in opts.footprint:
-        decals_kwargs = dict(fp_kwargs,color='darkorange')
-        draw_decals(m,**decals_kwargs)
-    if 'mw' in opts.footprint:
-        mw_kwargs = dict(color='k')
-        draw_milky_way(m,**mw_kwargs)
-
+        decals_kwargs = dict(fp_kwargs,color='m')
+        draw_decals(bmap,**decals_kwargs)
+    if 'delve' in opts.footprint:
+        delve_kwargs = dict(fp_kwargs,color='r')
+        draw_delve(bmap,**delve_kwargs)
 
     # Annotate with some information
     if opts.legend:
@@ -722,7 +765,7 @@ def plot(opts):
                        xycoords='figure fraction',size=8)
     plt.annotate(u'\u00a9'+' %s'%__author__,**auth_kwargs)
 
-    return m
+    return bmap
 
 if __name__ == "__main__":
     import argparse
@@ -749,6 +792,8 @@ if __name__ == "__main__":
                         help='draw figure legend')
     parser.add_argument('-m','--moon',default=True,type=boolean,
                         help='draw moon location and phase')
+    parser.add_argument('--mw',action='store_true',
+                        help='draw the Milky Way plane')
     parser.add_argument('-n','--numexp',default=None,type=int,
                         help='number of most recent exposures to plot')
     parser.add_argument('-o','--outfile',default=None,
@@ -777,7 +822,7 @@ if __name__ == "__main__":
                         format='%(message)s',stream=sys.stdout)
 
     if not opts.footprint: opts.footprint = ['des']
-    
+
     # Do the plotting
     m = plot(opts)
 
