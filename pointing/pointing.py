@@ -6,8 +6,9 @@ from collections import OrderedDict as odict
 from datetime import datetime,timedelta,tzinfo
 import dateutil.parser
 
-import mpl_toolkits.basemap as basemap
+import matplotlib
 from matplotlib.patches import Ellipse, Circle
+import mpl_toolkits.basemap as basemap
 import matplotlib.patheffects as patheffects
 from _tkinter import TclError
 
@@ -28,18 +29,25 @@ FIGSIZE=(10.5,8.5)
 SCALE=np.sqrt((8.0*6.0)/(FIGSIZE[0]*FIGSIZE[1]))
 DPI=80;
 
-FILTERS = ['u','g','r','i','z','Y','VR']
-BANDS = FILTERS + ['all']
 COLORS = odict([
-    ('none','black'),
+    ('N395','blue'),
     ('u','blue'),
+    ('N419','turquoise'),
     ('g','green'),
+    ('N501','olive'),
+    ('N540','olive'),
     ('r','red'),
+    ('N662','maroon'),
+    ('N673','maroon'),
+    ('N708','maroon'),
     ('i','gold'),
     ('z','magenta'),
+    ('N964','black'),
     ('Y','black'),
     ('VR','gray'),
 ])
+FILTERS = list(COLORS.keys())
+BANDS = FILTERS + ['all']
 
 # Allowed map projections
 PROJ = odict([
@@ -564,7 +572,7 @@ def plot(opts):
         color_idx = np.argmax(band==color_repeat,axis=0)
         color = np.array(COLORS.values())[color_idx]
     else:
-        color = COLORS['none']
+        color = 'black'
 
     # Select the exposure of interest
     if opts.expnum:
@@ -750,7 +758,8 @@ def plot(opts):
         leg_kwargs = dict(scatterpoints=1,fontsize=10,bbox_to_anchor=(0.08,0.20))
         handles, labels = [],[]
         for k in FILTERS:
-            if k == 'VR' and not (band=='VR').any(): continue
+            if not ((data['filter']==k).any() or (band==k).any()): 
+                continue
             labels.append(k)
             handles.append(plt.scatter(None,None,color=COLORS[k],**exp_kwargs))
         plt.legend(handles,labels,**leg_kwargs)
@@ -832,7 +841,7 @@ if __name__ == "__main__":
     if opts.outfile:
         # Save the figure
         logging.debug("Saving figure to: %s"%opts.outfile)
-        plt.savefig(opts.outfile,dpi=250)
+        plt.savefig(opts.outfile,dpi=150)
     elif not opts.refresh:
         # Show plot
         plt.show()
